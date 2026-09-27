@@ -11,6 +11,7 @@ void CALLBACK edit_own_text(HWND, UINT, UINT_PTR, DWORD);
 void CALLBACK edit_own_properties(HWND, UINT, UINT_PTR, DWORD);
 void create_test_node(HWND window);
 std::map<DWORD,int> graph_colors(HWND graph);
+std::vector<DWORD> graph_region(HWND graph, RECT region, const std::filesystem::path& screenshot = {});
 // Every UI case owns a fresh DLL, settings file and mock game directory.
 class Controls : public test_support::Files {
 protected:
@@ -30,5 +31,6 @@ protected:
     void SetUp() override;
     void TearDown() override;
     void pan();
+    void reopen(const std::string& configuration, const std::string& mission);
 };
 }

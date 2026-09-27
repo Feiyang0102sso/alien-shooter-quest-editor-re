@@ -207,6 +207,59 @@ std::map<DWORD,int> graph_colors(HWND graph) {
     return colors;
 }
 
+// Capture real paint output in logical coordinates, independently of monitor DPI.
+std::vector<DWORD> graph_region(HWND graph, RECT region, const std::filesystem::path& screenshot) {
+    const UINT dpi = GetDpiForWindow(graph);
+    region = {MulDiv(region.left,dpi,96),MulDiv(region.top,dpi,96),
+        MulDiv(region.right,dpi,96),MulDiv(region.bottom,dpi,96)};
+    RECT client{};
+    GetClientRect(graph,&client);
+    BITMAPINFO bitmap{};
+    bitmap.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bitmap.bmiHeader.biWidth = client.right;
+    bitmap.bmiHeader.biHeight = -client.bottom;
+    bitmap.bmiHeader.biPlanes = 1;
+    bitmap.bmiHeader.biBitCount = 32;
+    void* pixels = nullptr;
+    HDC context = CreateCompatibleDC(nullptr);
+    HBITMAP image = CreateDIBSection(context,&bitmap,DIB_RGB_COLORS,&pixels,nullptr,0);
+    const HGDIOBJ previous = SelectObject(context,image);
+    SendMessageW(graph,WM_PRINTCLIENT,reinterpret_cast<WPARAM>(context),PRF_CLIENT);
+    GdiFlush();
+    // Keep selected render samples beside the test fixture for visual inspection.
+    if (!screenshot.empty()) {
+        BITMAPFILEHEADER header{};
+        header.bfType = 0x4D42;
+        header.bfOffBits = sizeof(header)+sizeof(BITMAPINFOHEADER);
+        const DWORD pixel_bytes = client.right*client.bottom*sizeof(DWORD);
+        header.bfSize = header.bfOffBits+pixel_bytes;
+        std::ofstream output(screenshot,std::ios::binary);
+        output.write(reinterpret_cast<const char*>(&header),sizeof(header));
+        output.write(reinterpret_cast<const char*>(&bitmap.bmiHeader),sizeof(BITMAPINFOHEADER));
+        output.write(static_cast<const char*>(pixels),pixel_bytes);
+        ensure(bool(output),"Cannot save UI render sample");
+    }
+    std::vector<DWORD> result;
+    for (int y = region.top; y < std::min(region.bottom,client.bottom); ++y) {
+        for (int x = region.left; x < std::min(region.right,client.right); ++x) {
+            result.push_back(static_cast<DWORD*>(pixels)[y*client.right+x] & 0xFFFFFF);
+        }
+    }
+    SelectObject(context,previous);
+    DeleteObject(image);
+    DeleteDC(context);
+    return result;
+}
+
+void Controls::reopen(const std::string& configuration, const std::string& mission) {
+    destroy();
+    write(config,configuration);
+    write(directory / "mission.txt",mission);
+    window = create(GetModuleHandleW(nullptr),nullptr,GetCommandLineA(),0,nullptr);
+    graph = FindWindowExW(window,nullptr,L"QuestEditorRE.Graph.v1",nullptr);
+    pump();
+}
+
 
 void Controls::SetUp() {
     Files::SetUp();

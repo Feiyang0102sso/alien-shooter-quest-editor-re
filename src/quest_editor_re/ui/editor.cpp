@@ -27,6 +27,11 @@ constexpr int kToolbarHeight = 32;
 constexpr int kStatusHeight = 36;
 constexpr float kNodeWidth = 170;
 constexpr float kNodeHeight = 100;
+constexpr float kLevelAnchor = 32;
+constexpr float kHeadingGap = 8;
+constexpr COLORREF kActiveTabBackground = RGB(209,225,241);
+constexpr COLORREF kActiveTabText = RGB(38,64,90);
+constexpr COLORREF kActiveTabAccent = RGB(70,111,155);
 constexpr UINT kHostFinished = 0x029A029A;
 constexpr UINT kOpen = 100;
 constexpr UINT kSave = 101;
@@ -48,6 +53,25 @@ struct Connection {
     std::string target;
     bool branch = false;
 };
+
+// Mission font tags and line breaks are not part of the canvas preview.
+std::wstring preview_text(const std::string& bytes, unsigned codepage) {
+    auto preview = decode(bytes,codepage);
+    for (;;) {
+        const auto tag = preview.find(L"<Font=");
+        if (tag == std::wstring::npos) break;
+        const auto end = preview.find(L'>',tag);
+        if (end == std::wstring::npos) break;
+        preview.erase(tag,end-tag+1);
+    }
+    for (wchar_t& character : preview) {
+        if (character == L'\r' || character == L'\n') character = L' ';
+    }
+    const auto end = preview.find_last_not_of(L" \t");
+    if (end == std::wstring::npos) return {};
+    preview.resize(end+1);
+    return preview;
+}
 
 void append_encoding_menus(HMENU parent) {
         HMENU cfg_encoding = CreatePopupMenu();
@@ -214,6 +238,7 @@ public:
     HWND map_tabs = nullptr;
     std::vector<int> level_timelines;
     std::map<std::string, std::wstring> previews;
+    std::map<float, std::map<float, std::wstring>> main_headings;
     std::map<std::string, Position> default_positions;
     std::string selected;
     std::string selected_kind = "Quest";
@@ -236,10 +261,11 @@ public:
     ID2D1SolidColorBrush* brush = nullptr;
     IDWriteTextFormat* body_font = nullptr;
     IDWriteTextFormat* heading_font = nullptr;
+    IDWriteInlineObject* heading_ellipsis = nullptr;
 
     ~Editor() {
         if (embedded && IsWindow(owner)) RemoveWindowSubclass(owner,embedded_parent_proc,66);
-        release(brush); release(target); release(body_font); release(heading_font);
+        release(brush); release(target); release(body_font); release(heading_ellipsis); release(heading_font);
         release(text_factory); release(factory);
         if (font) DeleteObject(font);
         if (background) DeleteObject(background);
@@ -252,7 +278,7 @@ public:
         background = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
         done = child(window, L"BUTTON", quest::i18n::wide("common.ok"), WS_TABSTOP | BS_DEFPUSHBUTTON, kDone, font);
         cancel = child(window, L"BUTTON", quest::i18n::wide("common.cancel"), WS_TABSTOP, kCancel, font);
-        map_tabs = child(window, WC_TABCONTROLW, L"", WS_TABSTOP | TCS_SINGLELINE, kMapTabs, font);
+        map_tabs = child(window, WC_TABCONTROLW, L"", WS_TABSTOP | TCS_SINGLELINE | TCS_OWNERDRAWFIXED, kMapTabs, font);
         graph = CreateWindowExW(0, kGraphClass, quest::i18n::wide("editor.canvas_name"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_HSCROLL | WS_VSCROLL,
             0, 0, 100, 100, window, nullptr, module, this);
         status = child(window, L"STATIC", L"", SS_LEFTNOWORDWRAP, 0, font);
@@ -347,7 +373,6 @@ public:
     }
 
     void refresh_map_tabs() {
-        const int previous = TabCtrl_GetCurSel(map_tabs);
         TabCtrl_DeleteAllItems(map_tabs);
         level_timelines.clear();
         if (!session.path.empty()) level_timelines.push_back(0);
@@ -363,7 +388,51 @@ public:
             TCITEMW item{}; item.mask = TCIF_TEXT; item.pszText = label.data();
             SendMessageW(map_tabs,TCM_INSERTITEMW,index,reinterpret_cast<LPARAM>(&item));
         }
-        if (!level_timelines.empty()) TabCtrl_SetCurSel(map_tabs,std::clamp(previous,0,static_cast<int>(level_timelines.size())-1));
+        sync_map_tabs();
+    }
+
+    void sync_map_tabs() {
+        if (level_timelines.empty()) return;
+        int current = 0;
+        // Use the same left-hand anchor as quick jumps, with a half-pixel rounding tolerance.
+        for (size_t index = 1; index < level_timelines.size(); ++index) {
+            const float boundary = screen({60.0f+level_timelines[index]*206.0f,0}).x;
+            if (boundary > kLevelAnchor+0.5f) break;
+            current = static_cast<int>(index);
+        }
+        if (TabCtrl_GetCurSel(map_tabs) == current) return;
+        TabCtrl_SetCurSel(map_tabs,current);
+        InvalidateRect(map_tabs,nullptr,TRUE);
+    }
+
+    void draw_map_tab(const DRAWITEMSTRUCT& item) const {
+        const bool active = static_cast<int>(item.itemID) == TabCtrl_GetCurSel(map_tabs);
+        COLORREF background_color = GetSysColor(COLOR_BTNFACE);
+        COLORREF text_color = GetSysColor(COLOR_BTNTEXT);
+        if (active) {
+            background_color = kActiveTabBackground;
+            text_color = kActiveTabText;
+        }
+        const int saved = SaveDC(item.hDC);
+        SetDCBrushColor(item.hDC,background_color);
+        FillRect(item.hDC,&item.rcItem,static_cast<HBRUSH>(GetStockObject(DC_BRUSH)));
+        SetBkMode(item.hDC,TRANSPARENT);
+        SetTextColor(item.hDC,text_color);
+        SelectObject(item.hDC,font);
+        RECT label = item.rcItem;
+        const auto caption = std::to_wstring(item.itemID+1);
+        DrawTextW(item.hDC,caption.c_str(),-1,&label,DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        if (active) {
+            RECT accent = item.rcItem;
+            accent.top = accent.bottom-MulDiv(3,dpi,96);
+            SetDCBrushColor(item.hDC,kActiveTabAccent);
+            FillRect(item.hDC,&accent,static_cast<HBRUSH>(GetStockObject(DC_BRUSH)));
+        }
+        if ((item.itemState & ODS_FOCUS) && GetFocus() == map_tabs) {
+            InflateRect(&label,-MulDiv(3,dpi,96),-MulDiv(3,dpi,96));
+            DrawFocusRect(item.hDC,&label);
+        }
+        RestoreDC(item.hDC,saved);
     }
 
     void refresh() {
@@ -377,23 +446,29 @@ public:
         }
         default_positions = session.default_positions();
         previews.clear();
+        main_headings.clear();
         const auto text_blocks = mission_texts(session.mission);
         for (const auto& item : session.document.sections()) {
             if (item.kind != "Quest") continue;
-            std::wstring preview;
             const auto text_block = text_blocks.find(item.name);
-            if (text_block != text_blocks.end()) preview = decode(text_block->second,session.mission_codepage);
-            for (;;) {
-                const auto tag = preview.find(L"<Font=");
-                if (tag == std::wstring::npos) break;
-                const auto end = preview.find(L'>',tag);
-                if (end == std::wstring::npos) break;
-                preview.erase(tag,end-tag+1);
+            if (text_block != text_blocks.end()) {
+                previews[item.name] = preview_text(text_block->second,session.mission_codepage);
             }
-            for (wchar_t& character : preview) {
-                if (character == L'\r' || character == L'\n') character = L' ';
+            std::wstring heading;
+            if (session.document.version() <= 1) {
+                heading = preview_text(item.value("Coment2"),session.codepage);
+            } else {
+                std::string key;
+                std::istringstream(item.value("Coment2")) >> key;
+                const auto found = text_blocks.find(key);
+                if (found != text_blocks.end()) heading = preview_text(found->second,session.mission_codepage);
             }
-            previews[item.name] = preview;
+            if (heading.empty()) continue;
+            const auto position = node_position(item);
+            auto& content = main_headings[position.y][position.x];
+            // Imported layouts can place two definitions at exactly the same position.
+            if (!content.empty()) content += L" / ";
+            content += heading;
         }
         refresh_map_tabs();
         update_status();
@@ -697,6 +772,7 @@ public:
             SetWindowTextW(cancel,i18n::wide("common.cancel"));
             SetWindowTextW(graph,i18n::wide("editor.canvas_name"));
             release(body_font);
+            release(heading_ellipsis);
             release(heading_font);
             update_dpi(dpi);
             refresh();
@@ -772,6 +848,9 @@ public:
         if (!body_font) text_factory->CreateTextFormat(quest::i18n::wide("appearance.font_family"), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 12, quest::i18n::wide("appearance.body_locale"), &body_font);
         if (!heading_font) text_factory->CreateTextFormat(quest::i18n::wide("appearance.font_family"), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 12, quest::i18n::wide("appearance.heading_locale"), &heading_font);
         if (!body_font || !heading_font) throw std::runtime_error(quest::i18n::narrow("errors.text_format_initialization"));
+        if (!heading_ellipsis && FAILED(text_factory->CreateEllipsisTrimmingSign(heading_font,&heading_ellipsis))) {
+            throw std::runtime_error(quest::i18n::narrow("errors.text_format_initialization"));
+        }
         if (!target) {
             auto properties = D2D1::RenderTargetProperties();
             properties.dpiX = static_cast<float>(dpi);
@@ -839,6 +918,39 @@ public:
         }
     }
 
+    void draw_main_headings(const D2D1_SIZE_F& size) {
+        if (zoom <= 0.3f) return;
+        // The 24 world-unit gap above each row belongs to that row's main quest text.
+        const float height = 24*zoom;
+        for (const auto& [row,headings] : main_headings) {
+            for (auto heading = headings.begin(); heading != headings.end(); ++heading) {
+                const auto position = screen({heading->first,row});
+                if (position.y < 0 || position.y-height > size.height || position.x > size.width) continue;
+                float width = std::max(1.0f,size.width-position.x);
+                const auto next = std::next(heading);
+                if (next != headings.end()) width = (next->first-heading->first)*zoom-kHeadingGap;
+                if (width <= 0) continue;
+                const auto& content = heading->second;
+                IDWriteTextLayout* layout = nullptr;
+                const HRESULT result = text_factory->CreateTextLayout(content.c_str(),static_cast<UINT32>(content.size()),
+                    heading_font,width,height,&layout);
+                if (FAILED(result)) throw std::runtime_error(quest::i18n::narrow("errors.text_format_initialization"));
+                layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+                layout->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+                layout->SetFontSize(std::min(12.0f,height/1.3f),{0,static_cast<UINT32>(content.size())});
+                // Only another heading limits the text. The viewport edge never adds an ellipsis.
+                if (next != headings.end()) {
+                    DWRITE_TRIMMING trimming{};
+                    trimming.granularity = DWRITE_TRIMMING_GRANULARITY_CHARACTER;
+                    layout->SetTrimming(&trimming,heading_ellipsis);
+                }
+                color(0x303030);
+                target->DrawTextLayout(D2D1::Point2F(position.x,position.y-height),layout,brush,D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                layout->Release();
+            }
+        }
+    }
+
     void paint(HDC supplied = nullptr) {
         PAINTSTRUCT paint_state{};
         HDC context = supplied;
@@ -875,8 +987,7 @@ public:
         for (size_t index = 0; index < level_timelines.size(); ++index) {
             const int timeline = level_timelines[index];
             const float x = screen({60.0f + timeline * 206.0f, 0}).x;
-            color(0xA04040); target->DrawLine(D2D1::Point2F(x, 24), D2D1::Point2F(x, size.height), brush, 1);
-            text(quest::i18n::wide("editor.level_prefix") + std::to_wstring(index+1), D2D1::RectF(x + 4, 3, x + 130, 22), 0x303030);
+            color(0xA04040); target->DrawLine(D2D1::Point2F(x, 0), D2D1::Point2F(x, size.height), brush, 1);
         }
         for (const auto& section : sections) {
             if (section.kind != "Quest") continue;
@@ -916,6 +1027,7 @@ public:
             }
             draw_flags(section,body);
         }
+        draw_main_headings(size);
         if (connecting) {
             const auto source = session.document.find("Quest", connection_source);
             if (source) { const auto position = node_position(*source); draw_connection({position.x + kNodeWidth, position.y + kNodeHeight / 2}, world(cursor), connection_branch); }
@@ -932,6 +1044,7 @@ public:
         if (picking) text(quest::i18n::wide("editor.picking_overlay"), D2D1::RectF(14, size.height - 34, size.width - 10, size.height - 6), 0x2678C7, true);
         if (target->EndDraw() == D2DERR_RECREATE_TARGET) { release(brush); release(target); }
         update_scrollbars();
+        sync_map_tabs();
     }
 
     void update_scrollbars() {
@@ -1147,13 +1260,19 @@ LRESULT CALLBACK main_proc(HWND window, UINT message, WPARAM wparam, LPARAM lpar
         switch (message) {
         case WM_CREATE: editor->initialize(); return 0;
         case WM_SIZE: editor->layout_controls(); return 0;
+        case WM_DRAWITEM: {
+            const auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lparam);
+            if (item->CtlID != kMapTabs) break;
+            editor->draw_map_tab(*item);
+            return TRUE;
+        }
         case WM_NOTIFY: {
             const auto* change = reinterpret_cast<NMHDR*>(lparam);
             if (change->code != TCN_SELCHANGE) break;
             if (change->idFrom == kMapTabs) {
                 const int index = TabCtrl_GetCurSel(editor->map_tabs);
                 if (index >= 0 && index < static_cast<int>(editor->level_timelines.size())) {
-                    editor->offset.x = 32-(60.0f+editor->level_timelines[index]*206.0f)*editor->zoom;
+                    editor->offset.x = kLevelAnchor-(60.0f+editor->level_timelines[index]*206.0f)*editor->zoom;
                     editor->offset.y = -24;
                     InvalidateRect(editor->graph,nullptr,FALSE);
                 }

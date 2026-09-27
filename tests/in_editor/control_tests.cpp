@@ -2,6 +2,101 @@
 
 namespace editor_test {
 
+TEST_F(Controls, LevelNavigationFollowsCanvas) {
+    const std::string configuration = fixture+"Map=Level002\r\nTimeLine=4\r\n"
+        "Quest=1_1_3\r\nLevelNum=1\r\nTimeLine=12\r\n";
+    reopen(configuration,original_mission);
+    HWND tabs = GetDlgItem(window,134);
+    ASSERT_EQ(TabCtrl_GetItemCount(tabs),2);
+    TabCtrl_SetCurSel(tabs,1);
+    NMHDR change{tabs,134,TCN_SELCHANGE};
+    SendMessageW(window,WM_NOTIFY,134,reinterpret_cast<LPARAM>(&change));
+    pump();
+    EXPECT_EQ(TabCtrl_GetCurSel(tabs),1) << "Quick jump keeps the destination highlighted";
+    auto tab_colors = graph_colors(tabs);
+    EXPECT_GT(tab_colors[0xD1E1F1],0) << "Selected level has a persistent blue background";
+    EXPECT_GT(tab_colors[0x466F9B],0) << "Selected level has a blue accent";
+    graph_region(tabs,{0,0,120,25},workspace / "level-tabs.bmp");
+
+    // Drag right far enough to return from the second level to the first.
+    const UINT dpi = GetDpiForWindow(graph);
+    SendMessageW(graph,WM_MBUTTONDOWN,MK_MBUTTON,MAKELPARAM(MulDiv(50,dpi,96),MulDiv(200,dpi,96)));
+    SendMessageW(graph,WM_MOUSEMOVE,MK_MBUTTON,MAKELPARAM(MulDiv(650,dpi,96),MulDiv(200,dpi,96)));
+    SendMessageW(graph,WM_MBUTTONUP,0,MAKELPARAM(MulDiv(650,dpi,96),MulDiv(200,dpi,96)));
+    pump();
+    EXPECT_EQ(TabCtrl_GetCurSel(tabs),0) << "Panning back updates the selected level";
+
+    SendMessageW(graph,WM_HSCROLL,SB_BOTTOM,0);
+    pump();
+    EXPECT_EQ(TabCtrl_GetCurSel(tabs),1) << "Scrollbar navigation updates the selected level";
+    SendMessageW(graph,WM_HSCROLL,SB_TOP,0);
+    pump();
+    EXPECT_EQ(TabCtrl_GetCurSel(tabs),0);
+    // Zooming out from the second level reveals the preceding level at the left-hand anchor.
+    TabCtrl_SetCurSel(tabs,1);
+    SendMessageW(window,WM_NOTIFY,134,reinterpret_cast<LPARAM>(&change));
+    pump();
+    POINT zoom_point{MulDiv(700,dpi,96),MulDiv(200,dpi,96)};
+    ClientToScreen(graph,&zoom_point);
+    SendMessageW(graph,WM_MOUSEWHEEL,MAKEWPARAM(0,-240),MAKELPARAM(zoom_point.x,zoom_point.y));
+    pump();
+    EXPECT_EQ(TabCtrl_GetCurSel(tabs),0) << "Zoom also synchronizes the visible level";
+    SendMessageW(window,WM_COMMAND,101,0);
+    EXPECT_EQ(quest::read_file(config),configuration);
+}
+
+TEST_F(Controls, MainHeadingsUseTheirOwnRowsAndFreeSpace) {
+    auto document = quest::QuestDocument::parse(fixture);
+    document.set("Quest","1_1_1","Coment2","title");
+    const std::string rows = "Quest=1_2_0\r\nLevelNum=1\r\nTimeLine=0\r\n"
+        "Quest=1_2_1\r\nLevelNum=1\r\nTimeLine=1\r\nComent2=lower\r\n";
+    const std::string mission = original_mission
+        +"<title>\r\nProtect the complex and find the emergency exit\r\n"
+        +"<lower>\r\nLeave the complex\r\n";
+    reopen(document.bytes()+rows,original_mission);
+    const auto empty_first = graph_region(graph,{280,16,650,34});
+    const auto empty_lower = graph_region(graph,{280,97,650,115});
+    const auto empty_extension = graph_region(graph,{395,16,650,34});
+    reopen(document.bytes()+rows,mission);
+    graph_region(graph,{0,0,650,200},workspace / "headings-full.bmp");
+    EXPECT_NE(graph_region(graph,{280,16,650,34}),empty_first) << "First-row heading is above its own task";
+    EXPECT_NE(graph_region(graph,{280,97,650,115}),empty_lower) << "Lower-row heading is not drawn over the first row";
+    EXPECT_NE(graph_region(graph,{395,16,650,34}),empty_extension) << "A heading can extend beyond the card when there is no collision";
+    const auto full_heading = graph_region(graph,{280,16,650,34});
+
+    document.set("Quest","1_1_2","Coment2","next");
+    const std::string next_mission = mission+"<next>\r\nNext objective\r\n";
+    document.set("Quest","1_1_2","TimeLine","6");
+    reopen(document.bytes()+rows,next_mission);
+    EXPECT_EQ(graph_region(graph,{280,16,650,34}),full_heading) << "A distant heading does not abbreviate text that already fits";
+    document.set("Quest","1_1_2","TimeLine","2");
+    reopen(document.bytes()+rows,next_mission);
+    graph_region(graph,{0,0,650,200},workspace / "headings-collision.bmp");
+    const auto next_heading = graph_region(graph,{414,16,550,34});
+    document.set("Quest","1_1_1","Coment2","");
+    reopen(document.bytes()+rows,next_mission);
+    EXPECT_EQ(graph_region(graph,{414,16,550,34}),next_heading) << "Long preceding text must not overlap the next heading";
+}
+
+TEST_F(Controls, MainHeadingsSupportLegacyTextAndHideLevelLabels) {
+    auto document = quest::QuestDocument::parse(fixture);
+    document.set("Quest","1_1_1","Coment2","title ignored");
+    reopen(document.bytes(),original_mission+"<title>\r\nProtect the complex\r\n");
+    const auto modern = graph_region(graph,{280,16,650,34});
+    const auto top = graph_region(graph,{137,0,250,19});
+    int dark_pixels = 0;
+    for (const DWORD pixel : top) {
+        if ((pixel & 0xFF) < 128 && ((pixel >> 8) & 0xFF) < 128 && ((pixel >> 16) & 0xFF) < 128) ++dark_pixels;
+    }
+    EXPECT_EQ(dark_pixels,0) << "Canvas no longer displays floating level labels";
+
+    document.set("Quest","1_1_1","Coment2","Protect the complex");
+    auto legacy = document.bytes();
+    legacy.replace(legacy.find("FileVer=2"),9,"FileVer=1");
+    reopen(legacy,original_mission);
+    EXPECT_EQ(graph_region(graph,{280,16,650,34}),modern) << "Legacy literal text and modern mission references render identically";
+}
+
 TEST_F(Controls, ShowsClassicLayoutAndMenus) {
     ASSERT_TRUE((!IsWindowVisible(GetDlgItem(window,120)) && !IsWindowVisible(GetDlgItem(window,110)))) <<
         "classic layout hides search and properties by default";
