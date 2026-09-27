@@ -6,7 +6,7 @@ namespace game_test {
 const std::vector<std::string>& expected_checks() {
     static const std::vector<std::string> names{
         "levels_loaded", "first_group_loaded", "quest_reset",
-        "quest_begin_command", "mission_text_loaded"
+        "quest_begin_command", "mission_text_loaded", "quest_gives_item", "quest_removes_item"
     };
     return names;
 }

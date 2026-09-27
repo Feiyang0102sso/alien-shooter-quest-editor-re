@@ -59,6 +59,12 @@ Different releases, localized editions, and mods may alter the quest format or h
 
 The OK button in the properties window only applies changes to the current editing session. Save from the main window to write those changes to disk.
 
+The bonus page has separate Give and Remove columns. Each dropdown reads item IDs from
+`Weapon.cfg` beside the current quest configuration and filters by case-insensitive substring.
+Selecting a dropdown item adds it directly; Enter also adds an item. Lists support copying and pasting one ID per line;
+spaces and `^` are also accepted as separators, and duplicates are retained. Saving uses the
+game's space-separated format. Manual entry and pasting remain available without `Weapon.cfg`.
+
 ## Language and Encoding
 
 The interface supports Chinese and English and can be changed from the language menu. The selected language is stored in `QuestEditor.cfg`:

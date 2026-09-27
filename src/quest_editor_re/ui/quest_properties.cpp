@@ -1,11 +1,13 @@
 #include "../i18n/i18n.h"
 #include "quest_properties.h"
 #include "controls.h"
+#include "../game_files/file_io.h"
 #include <commctrl.h>
 #include <algorithm>
 #include <array>
 #include <sstream>
 #include <stdexcept>
+#include <cwctype>
 
 namespace quest {
 namespace {
@@ -15,6 +17,45 @@ constexpr int kRaw = 201;
 constexpr int kBody = 240;
 constexpr int kHeading = 241;
 constexpr int kComment = 242;
+constexpr int kGiveItems = 232;
+constexpr int kRemoveItems = 233;
+constexpr int kGiveFilter = 234;
+constexpr int kRemoveFilter = 235;
+constexpr UINT kAppendSelectedItem = WM_APP + 1;
+
+// Display one ID per line, but keep the engine's space-separated file format.
+std::wstring item_text(const std::wstring& text, const std::wstring& separator) {
+    std::wstring result;
+    std::wstring item;
+    for (wchar_t character : text + L" ") {
+        if (iswspace(character) || character == L'^') {
+            if (item.empty()) continue;
+            if (!result.empty()) result += separator;
+            result += item;
+            item.clear();
+        } else item += character;
+    }
+    return result;
+}
+
+LRESULT CALLBACK item_edit_procedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam,
+                                     UINT_PTR subclass, DWORD_PTR) {
+    if (message == WM_NCDESTROY) RemoveWindowSubclass(window, item_edit_procedure, subclass);
+    if (message == WM_KEYDOWN && wparam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+        SendMessageW(window, EM_SETSEL, 0, -1);
+        return 0;
+    }
+    const auto result = DefSubclassProc(window, message, wparam, lparam);
+    if (message == WM_PASTE) {
+        const auto text = control_text(window);
+        const auto normalized = item_text(text, L"\r\n");
+        if (text != normalized) {
+            SendMessageW(window, EM_SETSEL, 0, -1);
+            SendMessageW(window, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(normalized.c_str()));
+        }
+    }
+    return result;
+}
 
 struct Control {
     HWND window = nullptr;
@@ -50,6 +91,8 @@ struct Properties {
     std::vector<Control> controls;
     std::vector<Binding> bindings;
     std::vector<Coordinates> coordinates;
+    std::vector<std::wstring> item_names;
+    bool filtering_items = false;
 
     ~Properties() { if (font) DeleteObject(font); }
 
@@ -80,12 +123,107 @@ struct Properties {
         label(caption,pages,x,y,width);
         DWORD style = WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL;
         if (height > 25) style = WS_BORDER | WS_TABSTOP | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | ES_WANTRETURN;
+        if (id == kGiveItems || id == kRemoveItems) style |= ES_AUTOHSCROLL | WS_HSCROLL;
         if (matches > 1) style |= ES_READONLY;
         auto original = decode(value,draft.codepage);
+        if (id == kGiveItems || id == kRemoveItems) original = item_text(original, L"\r\n");
         if (matches > 1) original = quest::i18n::wide("properties.multiple_conditions") + original;
         HWND edit = add(L"EDIT",original,id,style,pages,x,y+21,width,height);
         SendMessageW(edit,EM_SETLIMITTEXT,1024*1024,0);
         bindings.push_back({edit,key,prefix,original});
+    }
+
+    void load_items() {
+        const auto path = draft.path.parent_path() / L"Weapon.cfg";
+        if (!std::filesystem::exists(path)) return;
+        std::istringstream input(read_file(path));
+        std::string line;
+        while (std::getline(input, line)) {
+            const auto comment = line.find(';');
+            if (comment != std::string::npos) line.resize(comment);
+            const auto equals = line.find('=');
+            if (equals == std::string::npos) continue;
+            const auto key = trim(line.substr(0, equals));
+            if (key != "Weapon" && key != "Ammo" && key != "Armor"
+                && key != "Implant" && key != "Equip" && key != "Objects") continue;
+            std::string item_id;
+            std::istringstream(line.substr(equals + 1)) >> item_id;
+            if (!item_id.empty()) item_names.push_back(decode(item_id, draft.codepage));
+        }
+        std::sort(item_names.begin(), item_names.end());
+        item_names.erase(std::unique(item_names.begin(), item_names.end()), item_names.end());
+    }
+
+    void filter_items(HWND combo, bool show) {
+        if (filtering_items) return;
+        filtering_items = true;
+        const auto query = control_text(combo);
+        const auto selection = SendMessageW(combo, CB_GETEDITSEL, 0, 0);
+        SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+        for (const auto& item_id : item_names) {
+            // Compare ordinal IDs case-insensitively without changing the saved spelling.
+            bool matches = query.empty();
+            for (size_t offset = 0; !matches && offset + query.size() <= item_id.size(); ++offset) {
+                matches = CompareStringOrdinal(item_id.data() + offset, static_cast<int>(query.size()),
+                    query.data(), static_cast<int>(query.size()), TRUE) == CSTR_EQUAL;
+            }
+            if (matches) SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(item_id.c_str()));
+        }
+        if (show) SendMessageW(combo, CB_SHOWDROPDOWN, TRUE, 0);
+        SetWindowTextW(combo, query.c_str());
+        SendMessageW(combo, CB_SETEDITSEL, 0, selection);
+        filtering_items = false;
+    }
+
+    void item_column(const char* key, const wchar_t* caption, int edit_id, int combo_id, int x) {
+        label(caption, 4, x, 130, 270);
+        label(quest::i18n::wide("properties.item_filter"), 4, x, 155, 270);
+        HWND combo = add(L"COMBOBOX", L"", combo_id, WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWN | CBS_AUTOHSCROLL,
+            4, x, 179, 270, 230);
+        SendMessageW(combo, CB_SETMINVISIBLE, 10, 0);
+        COMBOBOXINFO info{sizeof(info)};
+        GetComboBoxInfo(combo, &info);
+        SendMessageW(info.hwndItem, EM_SETCUEBANNER, FALSE,
+            reinterpret_cast<LPARAM>(quest::i18n::wide("properties.item_filter")));
+        filter_items(combo, false);
+        EnableWindow(combo, !item_names.empty());
+        field(key, quest::i18n::wide("properties.item_list"), edit_id, 4, x, 219, 270, 262);
+        SetWindowSubclass(GetDlgItem(window, edit_id), item_edit_procedure, 1, 0);
+    }
+
+    void append_item(int combo_id) {
+        HWND combo = GetDlgItem(window, combo_id);
+        auto index = SendMessageW(combo, CB_GETCURSEL, 0, 0);
+        if (index == CB_ERR) index = SendMessageW(combo, CB_FINDSTRINGEXACT, static_cast<WPARAM>(-1),
+            reinterpret_cast<LPARAM>(control_text(combo).c_str()));
+        if (index == CB_ERR && SendMessageW(combo, CB_GETCOUNT, 0, 0) == 1) index = 0;
+        if (index == CB_ERR) { MessageBeep(MB_OK); return; }
+        const auto length = SendMessageW(combo, CB_GETLBTEXTLEN, index, 0);
+        std::wstring item_id(static_cast<size_t>(length) + 1, L'\0');
+        SendMessageW(combo, CB_GETLBTEXT, index, reinterpret_cast<LPARAM>(item_id.data()));
+        item_id.resize(static_cast<size_t>(length));
+        int edit_id = kGiveItems;
+        if (combo_id == kRemoveFilter) edit_id = kRemoveItems;
+        HWND edit = GetDlgItem(window, edit_id);
+        auto text = item_text(control_text(edit), L"\r\n");
+        if (!text.empty()) text += L"\r\n";
+        text += item_id;
+        SendMessageW(edit, EM_SETSEL, 0, -1);
+        SendMessageW(edit, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(text.c_str()));
+        SendMessageW(edit, EM_SCROLLCARET, 0, 0);
+        SendMessageW(combo, CB_SHOWDROPDOWN, FALSE, 0);
+        SetWindowTextW(combo, L"");
+        filter_items(combo, false);
+        SetFocus(combo);
+    }
+
+    int focused_item_filter() const {
+        const HWND focus = GetFocus();
+        for (int id : {kGiveFilter, kRemoveFilter}) {
+            HWND combo = GetDlgItem(window, id);
+            if (combo && (focus == combo || IsChild(combo, focus))) return id;
+        }
+        return 0;
     }
 
     void check(const char* key, const wchar_t* caption, int id, int y) {
@@ -181,9 +319,13 @@ struct Properties {
             field("Comment",quest::i18n::wide("properties.comment"),kComment,3,14,527,570);
             field("AddMoneyMAIN",quest::i18n::wide("properties.money"),230,4,14,60,270);
             field("AddExperienceMAIN",quest::i18n::wide("properties.experience"),231,4,314,60,270);
-            field("AddItemMAIN",quest::i18n::wide("properties.add_items"),232,4,14,135,570);
-            field("RemItem",quest::i18n::wide("properties.remove_items"),233,4,14,210,570);
-            label(quest::i18n::wide("properties.advanced_hint"),4,14,296,570);
+            load_items();
+            item_column("AddItemMAIN", quest::i18n::wide("properties.add_items"), kGiveItems, kGiveFilter, 14);
+            item_column("RemItem", quest::i18n::wide("properties.remove_items"), kRemoveItems, kRemoveFilter, 314);
+            const wchar_t* hint = quest::i18n::wide("properties.items_hint");
+            if (item_names.empty()) hint = quest::i18n::wide("properties.items_missing");
+            add(L"STATIC", hint, 238, 0, 4, 14, 518, 570, 48);
+            label(quest::i18n::wide("properties.advanced_hint"),4,14,570,570);
         } else {
             page = 3;
             TabCtrl_SetCurSel(tabs,page);
@@ -244,6 +386,7 @@ struct Properties {
                 SendMessageW(binding.window,EM_SETREADONLY,matches > 1,0);
             }
             binding.original = decode(value,codepage);
+            if (id == kGiveItems || id == kRemoveItems) binding.original = item_text(binding.original, L"\r\n");
             if (matches > 1) binding.original = quest::i18n::wide("properties.multiple_conditions") + binding.original;
             SetWindowTextW(binding.window,binding.original.c_str());
         }
@@ -328,6 +471,8 @@ struct Properties {
                     }
                 } else if (!binding.prefix.empty()) {
                     candidate.document.set_condition(name,binding.key,binding.prefix,trim(encode(content,candidate.codepage)));
+                } else if (id == kGiveItems || id == kRemoveItems) {
+                    candidate.document.set(kind, name, binding.key, encode(item_text(content, L" "), candidate.codepage));
                 } else candidate.document.set(kind,name,binding.key,encode(content,candidate.codepage));
             }
         }
@@ -380,6 +525,22 @@ LRESULT CALLBACK procedure(HWND window, UINT message, WPARAM wparam, LPARAM lpar
         }
         if (message == WM_NOTIFY && reinterpret_cast<NMHDR*>(lparam)->idFrom == kTabs
             && reinterpret_cast<NMHDR*>(lparam)->code == TCN_SELCHANGE) { dialog->change_page(); return 0; }
+        if (message == kAppendSelectedItem) {
+            dialog->append_item(static_cast<int>(wparam));
+            return 0;
+        }
+        if (message == WM_COMMAND) {
+            const int id = LOWORD(wparam);
+            if ((id == kGiveFilter || id == kRemoveFilter) && HIWORD(wparam) == CBN_EDITCHANGE) {
+                dialog->filter_items(GetDlgItem(window, id), true);
+                return 0;
+            }
+            if ((id == kGiveFilter || id == kRemoveFilter) && HIWORD(wparam) == CBN_SELENDOK) {
+                // Let the native combo finish its selection before clearing the filter and list.
+                PostMessageW(window, kAppendSelectedItem, id, 0);
+                return 0;
+            }
+        }
         if (message == WM_COMMAND && LOWORD(wparam) == IDOK) {
             dialog->collect(); dialog->accepted = true; DestroyWindow(window); return 0;
         }
@@ -398,6 +559,7 @@ bool edit_properties(HWND owner, HINSTANCE module, EditSession& session,
     Properties dialog;
     // Property drafts do not need a copy of the undo history.
     dialog.draft.document = session.document; dialog.draft.mission = session.mission;
+    dialog.draft.path = session.path;
     dialog.draft.codepage = session.codepage; dialog.draft.mission_codepage = session.mission_codepage;
     dialog.kind = kind; dialog.name = name;
     dialog.dpi = GetDpiForWindow(owner);
@@ -428,10 +590,18 @@ bool edit_properties(HWND owner, HINSTANCE module, EditSession& session,
         const int result = GetMessageW(&message,nullptr,0,0);
         if (result <= 0) { if (!result) PostQuitMessage(static_cast<int>(message.wParam)); break; }
         if (message.message == WM_KEYDOWN && message.wParam == VK_ESCAPE) {
+            const int filter = dialog.focused_item_filter();
+            if (filter && SendDlgItemMessageW(window, filter, CB_GETDROPPEDSTATE, 0, 0)) {
+                SendDlgItemMessageW(window, filter, CB_SHOWDROPDOWN, FALSE, 0); continue;
+            }
             SendMessageW(window,WM_COMMAND,IDCANCEL,0); continue;
         }
         if (message.message == WM_KEYDOWN && message.wParam == VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)) {
             SendMessageW(window,WM_COMMAND,IDOK,0); continue;
+        }
+        if (message.message == WM_KEYDOWN && message.wParam == VK_RETURN) {
+            const int filter = dialog.focused_item_filter();
+            if (filter) { dialog.append_item(filter); continue; }
         }
         if (!IsDialogMessageW(window,&message)) { TranslateMessage(&message); DispatchMessageW(&message); }
     }

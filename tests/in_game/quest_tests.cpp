@@ -20,6 +20,13 @@ std::map<std::string, bool> run_game() {
     TemporaryFile original_script(script_path, recovery);
     TemporaryFile test_script(game / L"Maps" / L"qere-smoke.lgc", recovery);
     TemporaryFile test_config(game / L"AlienShooter.cfg", recovery);
+    TemporaryFile original_levels(config, recovery);
+    // Exercise real quest rewards using isolated quests written by the editor's serializer.
+    auto reward_document = document;
+    reward_document.set("Quest", "1_1_3", "AddItemMAIN", "Obj_dynamite Obj_dynamite");
+    ensure(reward_document.find("Quest", "1_1_4").has_value(), "Reward test requires quest 1_1_4");
+    reward_document.set("Quest", "1_1_4", "RemItem", "Obj_dynamite Obj_dynamite");
+    write(config, reward_document.bytes());
     write(game / L"Maps" / L"qere-smoke.lgc", quest::read_file(project / L"tests/assets/in_game/smoke.lgc"));
     script.insert(init + std::string("InitGame();").size(), "\r\n    QeSmokeTest();\r\n");
     const auto entry = script.find("main()");
@@ -43,6 +50,8 @@ std::map<std::string, bool> run_game() {
     original_script.restore();
     test_script.restore();
     test_config.restore();
+    original_levels.restore();
+    ensure(quest::read_file(config) == document.bytes(), "Original quest configuration must be restored byte-for-byte");
 
     return game_test::parse_results(log);
 }
@@ -66,4 +75,6 @@ TEST_F(Game, LoadsFirstQuestGroup) { EXPECT_TRUE(results.at("first_group_loaded"
 TEST_F(Game, ResetsQuestState) { EXPECT_TRUE(results.at("quest_reset")); }
 TEST_F(Game, BeginCommandChangesQuestState) { EXPECT_TRUE(results.at("quest_begin_command")); }
 TEST_F(Game, LoadsMissionText) { EXPECT_TRUE(results.at("mission_text_loaded")); }
+TEST_F(Game, QuestRewardAddsInventoryItem) { EXPECT_TRUE(results.at("quest_gives_item")); }
+TEST_F(Game, QuestRewardRemovesInventoryItem) { EXPECT_TRUE(results.at("quest_removes_item")); }
 }

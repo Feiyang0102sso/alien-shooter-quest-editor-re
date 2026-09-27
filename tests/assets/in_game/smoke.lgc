@@ -1,4 +1,5 @@
 // Run once after InitGame. Exercise the original engine with the actual levels.cfg.
+// The runner temporarily installs controlled reward quests and restores the original bytes.
 int qeTestFile = 0;
 int qeTestPassed = 0;
 int qeTestFailed = 0;
@@ -42,6 +43,14 @@ QeSmokeTest()
             SetLevelNumber(1, -1);
             SendCommand(EXT_RESETQUESTSYSTEM);
             QeTestAssert("quest_reset", SendCommand(EXT_GETQUESTSSTATE, 0, 3, 1) == QS_NOTBEGUN);
+            // Begin with an empty dynamite inventory; the reward must supply the item.
+            int cleanup = 0;
+            while (SendCommandA(-1, EXT_IFHASITEM, ITM_DYNAMITE) && cleanup < 100)
+            {
+                SendCommandA(-1, EXT_REMOVEITEMIFHAS, ITM_DYNAMITE);
+                cleanup++;
+            }
+            int hadDynamite = SendCommandA(-1, EXT_IFHASITEM, ITM_DYNAMITE);
             // SET takes the real group number; GET uses a zero-based group index.
             SendCommand(EXT_SETQUESTSTATE, 1, 3, QS_BEGUN);
             int state = SendCommand(EXT_GETQUESTSSTATE, 0, 3, 1);
@@ -49,6 +58,10 @@ QeSmokeTest()
             string body;
             body = SendCommand(EXT_GETQUESTNAME, 0, 3);
             QeTestAssert("mission_text_loaded", strlen(body) > 0);
+            int receivedDynamite = SendCommandA(-1, EXT_IFHASITEM, ITM_DYNAMITE);
+            QeTestAssert("quest_gives_item", hadDynamite == 0 && receivedDynamite > 0);
+            SendCommand(EXT_SETQUESTSTATE, 1, 4, QS_BEGUN);
+            QeTestAssert("quest_removes_item", receivedDynamite > 0 && SendCommandA(-1, EXT_IFHASITEM, ITM_DYNAMITE) == 0);
         }
     }
     FWrite(qeTestFile, "QERE|DONE|passed=" + itoa(qeTestPassed) + "|failed=" + itoa(qeTestFailed));
