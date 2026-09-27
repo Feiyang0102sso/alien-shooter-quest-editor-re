@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src" />
+    <Filter Include="src\backup" />
+    <Filter Include="src\core" />
+    <Filter Include="src\encoding" />
+    <Filter Include="src\game_files" />
+    <Filter Include="src\i18n" />
+    <Filter Include="tests" />
+    <Filter Include="tests\assets" />
+    <Filter Include="tests\assets\config" />
+    <Filter Include="tests\assets\in_game" />
+    <Filter Include="tests\assets\unit" />
+    <Filter Include="tests\common" />
+    <Filter Include="tests\in_editor" />
+    <Filter Include="tests\in_game" />
+    <Filter Include="tests\third_party" />
+    <Filter Include="tests\unit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\quest_editor_re\core\quest_document.cpp"><Filter>src\core</Filter></ClCompile>
+    <ClCompile Include="src\quest_editor_re\core\edit_session.cpp"><Filter>src\core</Filter></ClCompile>
+    <ClCompile Include="tests\unit\document_tests.cpp"><Filter>tests\unit</Filter></ClCompile>
+    <ClCompile Include="tests\unit\encoding_tests.cpp"><Filter>tests\unit</Filter></ClCompile>
+    <ClCompile Include="tests\unit\mission_tests.cpp"><Filter>tests\unit</Filter></ClCompile>
+    <ClCompile Include="tests\unit\i18n_tests.cpp"><Filter>tests\unit</Filter></ClCompile>
+    <ClCompile Include="tests\unit\session_tests.cpp"><Filter>tests\unit</Filter></ClCompile>
+    <ClCompile Include="tests\unit\backup_tests.cpp"><Filter>tests\unit</Filter></ClCompile>
+    <ClCompile Include="tests\unit\game_paths_tests.cpp"><Filter>tests\unit</Filter></ClCompile>
+    <ClCompile Include="tests\in_editor\control_fixture.cpp"><Filter>tests\in_editor</Filter></ClCompile>
+    <ClCompile Include="tests\in_editor\control_tests.cpp"><Filter>tests\in_editor</Filter></ClCompile>
+    <ClCompile Include="tests\in_editor\property_tests.cpp"><Filter>tests\in_editor</Filter></ClCompile>
+    <ClCompile Include="tests\in_editor\dialog_tests.cpp"><Filter>tests\in_editor</Filter></ClCompile>
+    <ClCompile Include="tests\in_editor\abi_tests.cpp"><Filter>tests\in_editor</Filter></ClCompile>
+    <ClCompile Include="tests\in_game\log_reader.cpp"><Filter>tests\in_game</Filter></ClCompile>
+    <ClCompile Include="tests\in_game\quest_tests.cpp"><Filter>tests\in_game</Filter></ClCompile>
+    <ClCompile Include="tests\in_editor\host_tests.cpp"><Filter>tests\in_editor</Filter></ClCompile>
+    <ClCompile Include="tests\common\test_environment.cpp"><Filter>tests\common</Filter></ClCompile>
+    <ClCompile Include="tests\common\report.cpp"><Filter>tests\common</Filter></ClCompile>
+    <ClCompile Include="tests\common\main.cpp"><Filter>tests\common</Filter></ClCompile>
+    <ClCompile Include="tests\in_editor\manual_tests.cpp"><Filter>tests\in_editor</Filter></ClCompile>
+    <ClCompile Include="tests\unit\game_log_tests.cpp"><Filter>tests\unit</Filter></ClCompile>
+    <ClCompile Include="tests\third_party\googletest\src\gtest-all.cc"><Filter>tests\third_party</Filter></ClCompile>
+    <ClCompile Include="src\quest_editor_re\core\mission_text.cpp"><Filter>src\core</Filter></ClCompile>
+    <ClCompile Include="src\quest_editor_re\game_files\file_io.cpp"><Filter>src\game_files</Filter></ClCompile>
+    <ClCompile Include="src\quest_editor_re\game_files\path_selection.cpp"><Filter>src\game_files</Filter></ClCompile>
+    <ClCompile Include="src\quest_editor_re\encoding\text_encoding.cpp"><Filter>src\encoding</Filter></ClCompile>
+    <ClCompile Include="src\quest_editor_re\backup\file_backup.cpp"><Filter>src\backup</Filter></ClCompile>
+    <ClInclude Include="src\quest_editor_re\core\mission_text.h"><Filter>src\core</Filter></ClInclude>
+    <ClInclude Include="src\quest_editor_re\encoding\text_encoding.h"><Filter>src\encoding</Filter></ClInclude>
+    <ClInclude Include="src\quest_editor_re\game_files\file_io.h"><Filter>src\game_files</Filter></ClInclude>
+    <ClInclude Include="src\quest_editor_re\core\quest_document.h"><Filter>src\core</Filter></ClInclude>
+    <ClInclude Include="src\quest_editor_re\core\edit_session.h"><Filter>src\core</Filter></ClInclude>
+    <ClInclude Include="tests\common\test_environment.h"><Filter>tests\common</Filter></ClInclude>
+    <ClInclude Include="tests\common\process.h"><Filter>tests\common</Filter></ClInclude>
+    <ClInclude Include="tests\common\game_environment.h"><Filter>tests\common</Filter></ClInclude>
+    <ClInclude Include="tests\common\report.h"><Filter>tests\common</Filter></ClInclude>
+    <ClInclude Include="tests\in_editor\control_fixture.h"><Filter>tests\in_editor</Filter></ClInclude>
+    <ClInclude Include="tests\in_game\log_reader.h"><Filter>tests\in_game</Filter></ClInclude>
+    <None Include="tests\main.bat"><Filter>tests</Filter></None>
+    <None Include="tests\README.md"><Filter>tests</Filter></None>
+    <None Include="tests\assets\config\test.cfg"><Filter>tests\assets\config</Filter></None>
+    <None Include="tests\assets\unit\levels.cfg"><Filter>tests\assets\unit</Filter></None>
+    <None Include="tests\assets\in_game\smoke.lgc"><Filter>tests\assets\in_game</Filter></None>
+    <None Include="tests\third_party\README.md"><Filter>tests\third_party</Filter></None>
+    <None Include="tests\third_party\googletest\LICENSE"><Filter>tests\third_party</Filter></None>
+    <ClInclude Include="src\quest_editor_re\i18n\i18n.h"><Filter>src\i18n</Filter></ClInclude>
+    <ClInclude Include="src\quest_editor_re\backup\file_backup.h"><Filter>src\backup</Filter></ClInclude>
+    <ClInclude Include="src\quest_editor_re\game_files\path_selection.h"><Filter>src\game_files</Filter></ClInclude>
+    <ClCompile Include="src\quest_editor_re\i18n\i18n.cpp"><Filter>src\i18n</Filter></ClCompile>
+    <ResourceCompile Include="src\quest_editor_re\i18n\translations.rc"><Filter>src\i18n</Filter></ResourceCompile>
+    <None Include="src\quest_editor_re\i18n\en.ini"><Filter>src\i18n</Filter></None>
+    <None Include="src\quest_editor_re\i18n\cn.ini"><Filter>src\i18n</Filter></None>
+    <None Include="QuestEditor.cfg" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,29 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "QuestEditor", "QuestEditor.vcxproj", "{A47FE256-0A75-4552-A590-AABF1BCC6631}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "QuestEditorLauncher", "QuestEditorLauncher.vcxproj", "{A47FE256-0A75-4552-A590-AABF1BCC6632}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "quest_editor_tests", "quest_editor_tests.vcxproj", "{A47FE256-0A75-4552-A590-AABF1BCC6633}"
+EndProject
+Global
+  GlobalSection(SolutionConfigurationPlatforms) = preSolution
+    Debug|Win32 = Debug|Win32
+    Release|Win32 = Release|Win32
+  EndGlobalSection
+  GlobalSection(ProjectConfigurationPlatforms) = postSolution
+    {A47FE256-0A75-4552-A590-AABF1BCC6631}.Debug|Win32.ActiveCfg = Debug|Win32
+    {A47FE256-0A75-4552-A590-AABF1BCC6631}.Debug|Win32.Build.0 = Debug|Win32
+    {A47FE256-0A75-4552-A590-AABF1BCC6631}.Release|Win32.ActiveCfg = Release|Win32
+    {A47FE256-0A75-4552-A590-AABF1BCC6631}.Release|Win32.Build.0 = Release|Win32
+    {A47FE256-0A75-4552-A590-AABF1BCC6632}.Debug|Win32.ActiveCfg = Debug|Win32
+    {A47FE256-0A75-4552-A590-AABF1BCC6632}.Debug|Win32.Build.0 = Debug|Win32
+    {A47FE256-0A75-4552-A590-AABF1BCC6632}.Release|Win32.ActiveCfg = Release|Win32
+    {A47FE256-0A75-4552-A590-AABF1BCC6632}.Release|Win32.Build.0 = Release|Win32
+    {A47FE256-0A75-4552-A590-AABF1BCC6633}.Debug|Win32.ActiveCfg = Debug|Win32
+    {A47FE256-0A75-4552-A590-AABF1BCC6633}.Release|Win32.ActiveCfg = Release|Win32
+  EndGlobalSection
+EndGlobal
+

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32"><Configuration>Debug</Configuration><Platform>Win32</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32"><Configuration>Release</Configuration><Platform>Win32</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals"><ProjectGuid>{A47FE256-0A75-4552-A590-AABF1BCC6632}</ProjectGuid><WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion></PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration"><ConfigurationType>Application</ConfigurationType><PlatformToolset>v145</PlatformToolset><CharacterSet>Unicode</CharacterSet></PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup><OutDir>$(ProjectDir)bin\$(Platform)\$(Configuration)\</OutDir><IntDir>$(ProjectDir)out\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir><TargetName>QuestEditor</TargetName><GenerateManifest>true</GenerateManifest></PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile><MultiProcessorCompilation>true</MultiProcessorCompilation><WarningLevel>Level4</WarningLevel><LanguageStandard>stdcpp20</LanguageStandard><AdditionalOptions>/utf-8 /permissive- %(AdditionalOptions)</AdditionalOptions><PreprocessorDefinitions>UNICODE;_UNICODE;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions><RuntimeLibrary>MultiThreaded</RuntimeLibrary><ExceptionHandling>Sync</ExceptionHandling><DebugInformationFormat>ProgramDatabase</DebugInformationFormat><Optimization>Disabled</Optimization></ClCompile>
+    <Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation><ProgramDatabaseFile>$(IntDir)$(ProjectName).pdb</ProgramDatabaseFile><AdditionalDependencies>d2d1.lib;dwrite.lib;comctl32.lib;comdlg32.lib;user32.lib;gdi32.lib;shell32.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\quest_editor_re\launcher\main.cpp" />
+    <ProjectReference Include="QuestEditor.vcxproj">
+      <Project>{A47FE256-0A75-4552-A590-AABF1BCC6631}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile><Optimization>MaxSpeed</Optimization></ClCompile>
+  </ItemDefinitionGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'"><LinkIncremental>false</LinkIncremental></PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile><RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary><PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\quest_editor_re\game_files\path_selection.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemGroup>
+    <ClInclude Include="src\quest_editor_re\i18n\i18n.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\quest_editor_re\game_files\path_selection.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\quest_editor_re\i18n\i18n.cpp" />
+    <ResourceCompile Include="src\quest_editor_re\i18n\translations.rc" />
+    <ResourceCompile Include="src\quest_editor_re\version.rc" />
+    <None Include="src\quest_editor_re\i18n\en.ini" />
+    <None Include="src\quest_editor_re\i18n\cn.ini" />
+    <None Include="QuestEditor.cfg" />
+  </ItemGroup></Project>

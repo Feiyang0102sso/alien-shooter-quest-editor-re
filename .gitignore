@@ -1,0 +1,13 @@
+build/
+out/
+dist/
+.vs/
+docs_old/
+bin/
+*.cfg
+!tests/assets/**/*.cfg
+*.user
+*.suo
+*.qere-layout
+*.qere.*.bak
+*.qere.*.tmp

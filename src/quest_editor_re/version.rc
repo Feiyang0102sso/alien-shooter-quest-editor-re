@@ -1,0 +1,39 @@
+#pragma code_page(65001)
+
+#include <windows.h>
+
+// EXE and DLL intentionally share the same product metadata.
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+ FILEFLAGS VS_FF_PRIVATEBUILD | VS_FF_SPECIALBUILD
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_UNKNOWN
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "Comments", "Feiyang\0"
+            VALUE "CompanyName", "Feiyang\0"
+            VALUE "FileDescription", "QuestEditorRe\0"
+            VALUE "FileVersion", "1.0.0.0\0"
+            VALUE "InternalName", "QuestEditorRe\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Feiyang\0"
+            VALUE "LegalTrademarks", "Feiyang\0"
+            VALUE "OriginalFilename", "QuestEditorRe\0"
+            VALUE "PrivateBuild", "Feiyang\0"
+            VALUE "ProductName", "QuestEditorRe\0"
+            VALUE "ProductVersion", "1.0.0.0\0"
+            VALUE "SpecialBuild", "Feiyang\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

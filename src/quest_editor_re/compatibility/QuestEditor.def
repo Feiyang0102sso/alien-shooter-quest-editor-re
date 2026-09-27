@@ -1,0 +1,7 @@
+LIBRARY QuestEditor
+EXPORTS
+    CreateNew_zQuestEditorMainWnd @1
+    Delete_zQuestEditorMainWnd @2
+    GetCustomData @3
+    SetGetQuestMode @4
+    SetTopMost @5
