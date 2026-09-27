@@ -13,6 +13,22 @@ QuestEditorRe is a remake of the original QuestEditor. It can run as a standalon
 - Provides Chinese and English interfaces and supports CP1251, GBK, and system ANSI game text.
 - Retains the original QuestEditor's Win32 DLL interface for integration with compatible map editors.
 
+## Screenshots
+
+QuestEditorRe is on the left; the original QuestEditor is on the right.
+
+### Main Interface
+
+![QuestEditorRe English main interface compared with the original QuestEditor](assets/editor-main-en.png)
+
+### Quest Properties
+
+![QuestEditorRe English quest properties compared with the original QuestEditor](assets/quest-properties-en.png)
+
+### Quest Rewards
+
+![QuestEditorRe English bonus page compared with the original QuestEditor](assets/quest-bonus-en.png)
+
 ## Installation and Usage
 
 Place the following files in the game directory. `QuestEditor.exe` and `QuestEditor.dll` must be in the same directory:

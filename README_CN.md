@@ -13,6 +13,22 @@ QuestEditorRe 是任务编辑器 QuestEditor 的重制版本，可独立运行�
 - 提供中文、英文界面，并支持 CP1251、GBK 和系统 ANSI 游戏文本。
 - 保留原版 QuestEditor 的 Win32 DLL 接口，可直接接入兼容的地图编辑器。
 
+## 界面截图
+
+左侧为 QuestEditorRe 重制版，右侧为原版 QuestEditor。
+
+### 主界面
+
+![QuestEditorRe 中文主界面与原版 QuestEditor 对比](assets/editor-main-cn.png)
+
+### 任务属性
+
+![QuestEditorRe 中文任务属性与原版 QuestEditor 对比](assets/quest-properties-cn.png)
+
+### 任务奖励
+
+![QuestEditorRe 中文奖励页与原版 QuestEditor 对比](assets/quest-bonus-cn.png)
+
 ## 安装与使用
 
 将下列文件放入游戏目录，`QuestEditor.exe` 和 `QuestEditor.dll` 必须位于同一目录：
